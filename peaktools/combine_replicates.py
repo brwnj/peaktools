@@ -13,18 +13,17 @@ __version__ = '$Revision: 436 $'
 # Copyright 2011, Jay R. Hesselberth
 
 import sys
+import itertools
 from collections import defaultdict, Counter
 from seqtools.formats import read_bed
 from genomedata._util import maybe_gzip_open
 
-def print_peaks(peak_tuples):
-    for chrom, start, stop in peak_tuples:
-        print "{chrom}\t{start}\t{stop}".format(chrom=chrom,
-                                                start=start,
-                                                stop=stop)
+def print_peak(chrom, start, stop):
+    print "{chrom}\t{start}\t{stop}".format(chrom=chrom,
+                                            start=start,
+                                            stop=stop)
 
-def combine_replicates(bedfilenames, min_rep, verbose):
-
+def get_region_counts(bedfilenames, verbose):
     # counts the number of times a base is covered by a peak call
     region_counts = defaultdict(Counter)
 
@@ -38,44 +37,41 @@ def combine_replicates(bedfilenames, min_rep, verbose):
                 for pos in range(datum.chromStart, datum.chromEnd):
                     region_counts[datum.chrom][pos] += 1
 
+    return region_counts
+
+def group_ranges(count_items):
+    # continuous intervals
+    return (list(g) for k, g in itertools.groupby(count_items, \
+                lambda x, y=itertools.count(): x[0]-next(y)))
+
+def combine_replicates(bedfilenames, min_rep, verbose):
+
+    region_counts = get_region_counts(bedfilenames, verbose)
+
     # go over the merged counts and report contiguous regions above
     # min_rep
     for chrom in sorted(region_counts):
 
-        region_start, region_stop, previous_pos = None, None, None
-        peaks = []
+        # grouped by continuous range
+        for grouped in group_ranges(sorted(region_counts[chrom].items(),\
+                                key=lambda x: x[0])):
 
-        for pos, count in sorted(region_counts[chrom].items(),\
-                                    key=lambda x: x[0]):
+            region_start, region_stop, previous_pos = None, None, None
+            peaks = []
 
-            if not previous_pos:
-                previous_pos = pos
+            for pos, count in grouped:
 
-            # interval gap; terminate previous peak
-            if not pos == previous_pos + 1 and region_start:
-                # print the previous peak
-                peaks.append((chrom, region_start, region_stop))
-                region_start, region_stop = None, None
+                if count >= min_rep:
+                    if not region_start:
+                        region_start = pos
+                    region_stop = pos + 1
 
-            # start or continue building peak
-            if count >= min_rep:
-                if not region_start:
-                    region_start = pos
-                region_stop = pos + 1
+                elif region_start:
+                    print_peak(chrom, region_start, region_stop)
+                    region_start, region_stop = None, None
 
-            # end this peak
-            elif count < min_rep and region_start:
-
-                peaks.append((chrom, region_start, region_stop))
-                region_start, region_stop = None, None
-
-            previous_pos = pos
-
-        # peak at the chromosome
-        if region_start:
-            peaks.append((chrom, region_start, pos + 1))
-
-        print_peaks(peaks)
+            if region_start:
+                print_peak(chrom, region_start, region_stop)
 
 def parse_options(args):
     from optparse import OptionParser
