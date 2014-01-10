@@ -17,6 +17,12 @@ from collections import defaultdict, Counter
 from seqtools.formats import read_bed
 from genomedata._util import maybe_gzip_open
 
+def print_peaks(peak_tuples):
+    for chrom, start, stop in peak_tuples:
+        print "{chrom}\t{start}\t{stop}".format(chrom=chrom,
+                                                start=start,
+                                                stop=stop)
+
 def combine_replicates(bedfilenames, min_rep, verbose):
 
     # counts the number of times a base is covered by a peak call
@@ -34,28 +40,46 @@ def combine_replicates(bedfilenames, min_rep, verbose):
 
     # go over the merged counts and report contiguous regions above
     # min_rep
-    region_start = region_stop = None
-
     for chrom in sorted(region_counts):
-        for pos in sorted(region_counts[chrom]):
 
-            count = region_counts[chrom][pos]
+        region_start, region_stop, previous_pos = None, None, None
+        peaks = []
 
+        for pos, count in sorted(region_counts[chrom].items(),\
+                                    key=lambda x: x[0]):
+
+            if not previous_pos:
+                previous_pos = pos
+
+            # interval gap; terminate previous peak
+            if not pos == previous_pos + 1 and region_start:
+                # print the previous peak
+                peaks.append((chrom, region_start, region_stop))
+                region_start, region_stop = None, None
+
+            # start or continue building peak
             if count >= min_rep:
                 if not region_start:
                     region_start = pos
-                region_stop = pos     
+                region_stop = pos + 1
 
+            # end this peak
             elif count < min_rep and region_start:
 
-                fields = (chrom, region_start, region_stop)
-                print '\t'.join(map(str, fields))
+                peaks.append((chrom, region_start, region_stop))
+                region_start, region_stop = None, None
 
-                region_start = region_stop = None
+            previous_pos = pos
+
+        # peak at the chromosome
+        if region_start:
+            peaks.append((chrom, region_start, pos + 1))
+
+        print_peaks(peaks)
 
 def parse_options(args):
     from optparse import OptionParser
-    
+
     description = ("Merge peak calls from BED regions")
     usage = '%prog [options] BEDFILES...'
     version = '%%prog %s' % __version__
