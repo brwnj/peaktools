@@ -34,7 +34,7 @@ def interpolate_peaks(gdfilename, bedfilename, trackname, spec_chrom,
     with Genome(gdfilename) as genome, \
         maybe_gzip_open(bedfilename) as bedfile:
         for datum in read_native(bedfile):
-        
+
             chrom = datum.chrom
             peak_start = datum.chromStart
             peak_end = datum.chromEnd
@@ -65,19 +65,19 @@ def fit_spline(xs, ys):
     coefs_c = [i for i in coefs[4]]
     coefs_d = [i for i in coefs[5]]
 
-    b_max_idx = max([(coef, idx) for idx, coef in 
+    b_max_idx = max([(coef, idx) for idx, coef in
                   enumerate(coefs_b)])[1]
     c_max_idx = max([(coef, idx) for idx, coef in
                   enumerate(coefs_c)])[1]
 
     # print ">> c max: %d -> b max: %d" % (c_max, b_max)
     # pdb.set_trace()
-   
+
     return (xs[c_max_idx], xs[b_max_idx])
 
 def parse_options(args):
     from optparse import OptionParser, OptionGroup
-    
+
     description = ("Find peak changepoints by interpolation.")
     usage = '%prog [options] GENOMEDATADIR BEDFILENAME'
     version = '%%prog %s' % __version__
@@ -89,7 +89,7 @@ def parse_options(args):
     group.add_option("-t", "--trackname",
         action="store", dest="trackname",
         help="trackname [default: %default]",
-        default=None)    
+        default=None)
 
     parser.add_option_group(group)
 
@@ -105,7 +105,7 @@ def parse_options(args):
     group.add_option("-v", "--verbose",
         action="store_true", dest="verbose",
         help="maximum verbosity [default: %default]",
-        default=False)    
+        default=False)
 
     parser.add_option_group(group)
 

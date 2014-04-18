@@ -11,16 +11,15 @@ the algorithm.'''
 import sys
 
 from numpy import isnan, log10
-
-from seqtools.formats import read_bed
-from genomedata._util import maybe_gzip_open
+from toolshed import reader
 from segtools import ProgressBar
 
 __author__ = 'Jay Hesselberth'
 __contact__ = 'jay.hesselberth@gmail.com'
-__version__ = '$Revision: 444 $'
+__version__ = 'Revision: XXX'
 
 # Copyright 2010,2011 Jay R. Hesselberth
+
 
 def calc_qvalues(real_bedfilename, null_bedfilename, log_pvalues, verbose):
 
@@ -34,7 +33,7 @@ def calc_qvalues(real_bedfilename, null_bedfilename, log_pvalues, verbose):
     num_null = float(len(null_pvals))
 
     # make sure both are defined
-    assert num_real and num_null 
+    assert num_real and num_null
 
     # normalization factor to account for different numbers of real and
     # null p-values
@@ -47,39 +46,38 @@ def calc_qvalues(real_bedfilename, null_bedfilename, log_pvalues, verbose):
     pval_thresh = compute_pval_thresh(real_pvals, null_pvals, verbose)
 
     # go back over real pvalues and assign qvalues
-    with maybe_gzip_open(real_bedfilename) as bedfile:
-        for datum in read_bed(bedfile):
+    for d in reader(real_bedfilename, header=['chrom','start','end','name','score','strand']):
 
-            if log_pvalues:
-                pval = float(datum.score)
-            else:
-                pval = -1 * log10(pvalue)
+        if log_pvalues:
+            pval = float(d['score'])
+        else:
+            pval = -1 * log10(pval)
 
-            qval = pval_thresh[pval]
+        qval = pval_thresh[pval]
 
-            norm_qval = qval * frac_real
+        norm_qval = qval * frac_real
 
-            # print in table format
-            fields = (datum.chrom, datum.chromStart, datum.chromEnd,
-                      datum.name, pval, datum.strand, norm_qval)
-            print '\t'.join(map(str, fields))
+        # print in table format
+        fields = (d['chrom'], d['start'], d['end'],
+                  d['name'], pval, d['strand'], norm_qval)
+        print '\t'.join([str(f) for f in fields])
+
 
 def read_pvalues(bedfilename, log_pvalues, verbose):
     ''' read in p-values from a bed file score field.
-    
+
     returns: list sorted by signifance (most significant first)'''
     pvals = []
 
     if verbose:
         print >>sys.stderr, ">> reading p-values from %s .." % bedfilename
 
-    with maybe_gzip_open(bedfilename) as bedfile:
-        for datum in read_bed(bedfile):
-            if log_pvalues:
-                pval = datum.score
-            else:
-                pval = -1 * log10(pvalue)
-            pvals.append(pval)
+    for d in reader(bedfilename, header=['chrom','start','end','name','score','strand']):
+        if log_pvalues:
+            pval = float(d['score'])
+        else:
+            pval = -1 * log10(pval)
+        pvals.append(pval)
 
     if verbose:
         print >>sys.stderr, ">> read %d p-values" % len(pvals)
@@ -94,11 +92,12 @@ def read_pvalues(bedfilename, log_pvalues, verbose):
 
     return pvals
 
+
 def compute_pval_thresh(real_pvals, null_pvals, verbose):
     ''' given an observed p-value and a collection of real and random p-values,
     calculate the empirical false discovery rate (FDR) for the p-value.
-    
-    returns: float'''
+
+    returns: dictionary of floats'''
 
     pval_thresh = dict()
 
@@ -113,7 +112,7 @@ def compute_pval_thresh(real_pvals, null_pvals, verbose):
         if obs_pval in pval_thresh: continue
 
         real_pvals_better = num_pvals_better(obs_pval, real_pvals, verbose)
-        null_pvals_better = num_pvals_better(obs_pval, null_pvals, verbose) 
+        null_pvals_better = num_pvals_better(obs_pval, null_pvals, verbose)
 
         if real_pvals_better == 0:
             qval = 0.0
@@ -126,10 +125,11 @@ def compute_pval_thresh(real_pvals, null_pvals, verbose):
 
     return pval_thresh
 
+
 def num_pvals_better(obs_pval, pvals, verbose):
     ''' calculate the number of p-values in a collection that are
-    more significant than an observed p-value.  
-   
+    more significant than an observed p-value.
+
     obs_pval: observed pvalue
     pvals: sorted list of pvalues
     verbose: verbosity flag
@@ -141,14 +141,15 @@ def num_pvals_better(obs_pval, pvals, verbose):
     for pval in pvals:
         if pval > obs_pval:
             num_better += 1
-        else: 
+        else:
             break # can't get any better
 
     return num_better
-                
+
+
 def parse_options(args):
     from optparse import OptionParser
-    
+
     description = ("Compute q-values (i.e. FDR's) from real and null p-values "
                    "in BED format")
     usage = '%prog [options] REAL_BEDFILENAME NULL_BEDFILENAME'
@@ -161,12 +162,12 @@ def parse_options(args):
     parser.add_option("-l", "--log-pvalues",
         action="store_true", dest="log_pvalues",
         help="pvalues are log-transformed [default: %default]",
-        default=True)    
+        default=True)
 
     parser.add_option("-v", "--verbose",
         action="store_true", dest="verbose",
         help="verbose output [default: %default]",
-        default=False)    
+        default=False)
 
     options, args = parser.parse_args()
 
@@ -175,6 +176,7 @@ def parse_options(args):
 
     return options, args
 
+
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
     real_bedfilename, null_bedfilename = args
@@ -182,6 +184,6 @@ def main(args=sys.argv[1:]):
               'verbose':options.verbose}
     return calc_qvalues(real_bedfilename, null_bedfilename, **kwargs)
 
+
 if __name__ == '__main__':
     sys.exit(main())
-

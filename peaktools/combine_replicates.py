@@ -14,14 +14,15 @@ __version__ = '$Revision: 436 $'
 
 import sys
 import itertools
+from toolshed import reader
 from collections import defaultdict, Counter
-from seqtools.formats import read_bed
-from genomedata._util import maybe_gzip_open
+
 
 def print_peak(chrom, start, stop):
     print "{chrom}\t{start}\t{stop}".format(chrom=chrom,
                                             start=start,
                                             stop=stop)
+
 
 def get_region_counts(bedfilenames, verbose):
     # counts the number of times a base is covered by a peak call
@@ -32,17 +33,18 @@ def get_region_counts(bedfilenames, verbose):
             print >>sys.stderr, ">> loading regions from %s" % \
                 bedfilename
 
-        with maybe_gzip_open(bedfilename) as bedfile:
-            for datum in read_bed(bedfile):
-                for pos in range(datum.chromStart, datum.chromEnd):
-                    region_counts[datum.chrom][pos] += 1
+        for d in reader(bedfilename, header=['chrom','start','end','name','score','strand']):
+            for pos in range(int(d['start']), int(d['end'])):
+                region_counts[d['chrom']][pos] += 1
 
     return region_counts
 
+
 def group_ranges(count_items):
     # continuous intervals
-    return (list(g) for k, g in itertools.groupby(count_items, \
+    return (list(g) for k, g in itertools.groupby(count_items,\
                 lambda x, y=itertools.count(): x[0]-next(y)))
+
 
 def combine_replicates(bedfilenames, min_rep, verbose):
 
@@ -54,7 +56,7 @@ def combine_replicates(bedfilenames, min_rep, verbose):
 
         # grouped by continuous range
         for grouped in group_ranges(sorted(region_counts[chrom].items(),\
-                                key=lambda x: x[0])):
+                                    key=lambda x: x[0])):
 
             region_start, region_stop, previous_pos = None, None, None
             peaks = []
@@ -72,6 +74,7 @@ def combine_replicates(bedfilenames, min_rep, verbose):
 
             if region_start:
                 print_peak(chrom, region_start, region_stop)
+
 
 def parse_options(args):
     from optparse import OptionParser
@@ -101,6 +104,7 @@ def parse_options(args):
 
     return options, args
 
+
 def main(args=sys.argv[1:]):
 
     options, args = parse_options(args)
@@ -112,6 +116,6 @@ def main(args=sys.argv[1:]):
 
     return combine_replicates(bedfilenames, **kwargs)
 
+
 if __name__ == '__main__':
     sys.exit(main())
-

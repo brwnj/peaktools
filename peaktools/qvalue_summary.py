@@ -58,7 +58,7 @@ def read_qvalues(qvalue_filename):
 
 def parse_options(args):
     from optparse import OptionParser
-    
+
     description = ("report a summary of calculate q-values")
     usage = '%prog [options] QVALUE_DATA_FILENAME'
     version = '%%prog %s' % __version__
